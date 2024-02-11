@@ -90,9 +90,6 @@ const modules = {
   inventoryService: {
     resolve: "@medusajs/inventory",
   },
-  stockLocationService: {
-    resolve: "@medusajs/stock-location",
-  },
 };
 
 const featureFlags = {
