@@ -4,8 +4,9 @@ import axios, { AxiosRequestConfig } from 'axios';
 import { useAdminCreateCollection, useAdminCreateProduct , useAdminCreateProductCategory, useAdminProductCategories} from "medusa-react";
 import { AdminPostProductCategoriesReq, AdminPostProductsReq, ProductCategory, ProductStatus } from "@medusajs/medusa";
 import './style.css'
-import { Button, Input, Select, Toaster, useToast } from "@medusajs/ui";
+import { Button, Container, Heading, Input, Select, Toaster, useToast } from "@medusajs/ui";
 import CircularProgress from '@mui/material/CircularProgress';
+import { ALPB_BASE_URL, GET_ALL_CATEGORIES, GET_ALL_PRODUCTS, GET_PRODUCTS_BY_CATEGORIES, GET_PRODUCT_DETAILS } from "./constants";
 
 type Product = {
     product_number:string;
@@ -34,7 +35,7 @@ const CreateProduct = () => {
   const [nextPage, setNextPage] = useState(null);
   const [prevPage, setPrevPage] = useState(null);
   const pageCount = Math.ceil(count / 25); // Assuming 5 items per page
-  const baseUrl ="https://www.alphabroder.com/media/hires";
+  const imageUrlPrefix ="https://www.alphabroder.com/media/hires";
   const { product_categories, isLoading } = useAdminProductCategories();
   const [inputSearchValue, setInputSearchValue] = useState('');
 
@@ -48,7 +49,7 @@ const CreateProduct = () => {
   const fetchData = async () => {
     try {
       const response = await axios.get(
-        "http://13.51.207.54/api/products/?page=1&page_size=32",
+        `${GET_ALL_PRODUCTS}?page=1&page_size=32`,
         {
           headers: {
             accept: "application/json",
@@ -73,7 +74,7 @@ const CreateProduct = () => {
   const fetchCategories = async () => {
     try {
       const response = await axios.get(
-        "http://13.51.207.54/api/categories/",
+        GET_ALL_CATEGORIES,
         {
           headers: {
             accept: "application/json",
@@ -129,7 +130,7 @@ const CreateProduct = () => {
   const getAllImages = (varients: any[]): any[] => {
     let images = [];
     varients.forEach(varient => {
-      images.push(`${baseUrl}/${varient?.front_image}`);
+      images.push(`${imageUrlPrefix}/${varient?.front_image}`);
     });
     return images;
   }
@@ -160,7 +161,7 @@ const CreateProduct = () => {
     full_feature_description,
     is_giftcard: false,
     discountable: false,
-    images: [`${baseUrl}/${clickedProductDetails.front_image}`,
+    images: [`${imageUrlPrefix}/${clickedProductDetails.front_image}`,
   ...images],
     // status: ProductStatus.DRAFT,
     options: [
@@ -222,7 +223,7 @@ const CreateProduct = () => {
   const handleExportClick = async (product) => {
     try {
       const selectedProductDetailsResponse = await axios.get(
-        `http://13.51.207.54/api/${product.product_number}/`,
+        `${GET_PRODUCT_DETAILS}${product.product_number}`,
         {
           headers: {
             accept: "application/json",
@@ -266,7 +267,7 @@ const CreateProduct = () => {
     const categoryName = encodeURIComponent(category);
     try {
       const response = await axios.get(
-        `http://13.51.207.54/api/products/?category=${categoryName}`,
+        `${GET_PRODUCTS_BY_CATEGORIES}${categoryName}`,
         {
           headers: {
             accept: "application/json",
@@ -274,7 +275,7 @@ const CreateProduct = () => {
         }
       );
       setProducts(response.data.results);
-      // setLoading(false);
+      setLoading(false);
       setCount(response.data.count);
         setNextPage(response.data.next);
         setPrevPage(response.data.previous);
@@ -308,16 +309,17 @@ const CreateProduct = () => {
 
   const fetchSearchedProduct = async (productNumber) => {
     setLoading(true);
+    const product_id = productNumber.replace("ALPB", "");
     try {
       const response = await axios.get(
-        `http://13.51.207.54/api/${productNumber}/`,
+        `${GET_PRODUCT_DETAILS}${product_id}`,
         {
           headers: {
             accept: "application/json",
           },
         }
       );
-      setProducts([response.data]);
+      setProducts(response.data.results);
       setLoading(false);
     } catch (error) {
       toast({ 
@@ -347,7 +349,7 @@ const CreateProduct = () => {
           <div>
             <div className="headerTab">
               <div className="header-text">
-                <h1>Alphabroder</h1>
+                <Heading>Alphabroder</Heading>
               </div>
               {allCategories && (
                 <div className="category-filter-container">
@@ -371,7 +373,7 @@ const CreateProduct = () => {
             </div>
             <div className="search-container">
               <Input
-                placeholder="Search Using Product No."
+                placeholder="Search Using Product No. or Description"
                 id="search-input-id"
                 type="search"
                 value={inputSearchValue}
@@ -387,12 +389,17 @@ const CreateProduct = () => {
                   </div>
                 </div>
               )}
-              {products && (
+              {!loading && products && products.length === 0 && (
+                <div>
+                  <Container>No Product(s) Available!</Container>
+                </div>
+                  )}
+              {products && products.length > 0 && (
                 <div className="product-grid">
                   {products.map((product, index) => (
                     <div key={index} className="product-card">
                       <img
-                        src={`${baseUrl}/${product.front_image}`}
+                        src={`${imageUrlPrefix}/${product.front_image}`}
                         alt={product.short_description}
                       />
                       <h3>{product.short_description}</h3>
@@ -444,7 +451,7 @@ const CreateProduct = () => {
 
 export const config: RouteConfig = {
   link: {
-    label: "Alphaborder",
+    label: "Alphabroder",
   },
 }
 export default CreateProduct;
