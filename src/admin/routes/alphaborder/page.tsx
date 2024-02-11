@@ -1,33 +1,12 @@
 import { RouteConfig } from "@medusajs/admin"
-import Medusa from "@medusajs/medusa-js"
 import React, { useEffect, useState } from 'react';
 import axios, { AxiosRequestConfig } from 'axios';
-import { useAdminCollections, useAdminCreateCollection, useAdminCreateProduct } from "medusa-react";
-import { AdminPostProductsReq } from "@medusajs/medusa";
+import { useAdminCreateCollection, useAdminCreateProduct , useAdminCreateProductCategory, useAdminProductCategories} from "medusa-react";
+import { AdminPostProductCategoriesReq, AdminPostProductsReq, ProductCategory, ProductStatus } from "@medusajs/medusa";
 import './style.css'
+import { Button, Input, Select, Toaster, useToast } from "@medusajs/ui";
+import CircularProgress from '@mui/material/CircularProgress';
 
-type CreateProductData = {
-  title: string;
-  is_giftcard: false;
-  discountable: false;
-  collection_id: string;
-  thumbnail:string;
-  images:string[];
-  options: {
-    title: string
-  }[];
-  variants: {
-    title: string
-    prices: {
-      amount: number
-      currency_code :string
-    }[]
-    options: {
-      value: string
-    }[]
-  }[];
-  
-};
 type Product = {
     product_number:string;
     short_description:string;
@@ -35,26 +14,7 @@ type Product = {
     full_feature_description:string;
     front_image:string;
     price_range:any;
-
-    
-    // Add more fields as needed
   };
-  type singleProduct = {
-    product_number:string;
-    short_description:string;
-    category: string,
-    full_feature_description:string;
-    front_image:string;
-    price_range:any;
-
-    
-    // Add more fields as needed
-  };
-  
-  interface CollectionT {
-    id: string;
-    title: string;
-  }
   
   interface ProductS {
     product_number: string;
@@ -62,32 +22,21 @@ type Product = {
   }
 
 const CreateProduct = () => {
+  const { toast } = useToast()
   const createProduct = useAdminCreateProduct();
+  const createCategory = useAdminCreateProductCategory();
   const [products, setProducts] = useState<Product[]>([]);
+  const [filteredProducts, setFilteredProducts] = useState<Product[]>();
+  const [allCategories, setAllCategories] = useState<Product[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [count, setCount] = useState(0);
   const [nextPage, setNextPage] = useState(null);
   const [prevPage, setPrevPage] = useState(null);
   const pageCount = Math.ceil(count / 25); // Assuming 5 items per page
-  const [searchTerm, setSearchTerm] = useState('');
-  const [singleProductData, setSingleProductData] = useState('')
   const baseUrl ="https://www.alphabroder.com/media/hires";
-  const { collections, isLoading } = useAdminCollections();
-  const createCollection = useAdminCreateCollection();
-
-
-
-  
-  
-  
-  const handleSearchChange = (event) => {
-    setSearchTerm(event.target.value);
-  };
-
-  const filteredProducts = products.filter((product) => {
-    return product.short_description.toLowerCase().includes(searchTerm.toLowerCase());
-  });
+  const { product_categories, isLoading } = useAdminProductCategories();
+  const [inputSearchValue, setInputSearchValue] = useState('');
 
   const truncateDescription = (text: string, maxLength: number) => {
     if (text.length > maxLength) {
@@ -96,138 +45,203 @@ const CreateProduct = () => {
     return text;
   };
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const response = await axios.get(
-          "http://13.51.207.54/api/products/?page=1&page_size=32",
-          {
-            headers: {
-              accept: "application/json",
-            },
-          }
-        );
-        setProducts(response.data.results);
-        setLoading(false);
-        setCount(response.data.count);
-        setNextPage(response.data.next);
-        setPrevPage(response.data.previous);
-      } catch (error) {
-        setError("An error occurred while fetching products.");
-        setLoading(false);
-      }
-    };
-
-    fetchData();
-  }, []);
-
-  const handleExportClick = async (productNumber) => {
+  const fetchData = async () => {
     try {
       const response = await axios.get(
-        `http://13.51.207.54/api/${productNumber}/`,
+        "http://13.51.207.54/api/products/?page=1&page_size=32",
         {
           headers: {
             accept: "application/json",
           },
         }
       );
-      // const collectionsT: CollectionT[] = collections;
-      // const productsT: ProductS[] = response.data;
-      // function findCollectionId(productsT: ProductS[], collectionsT: CollectionT[]): string | null {
-      //   for (const product of productsT) {
-      //     for (const collection of collectionsT) {
-      //       if (product.category === collection.title) {
-      //         return collection.id;
-      //       }
-      //     }
-      //   }
-      //   return null;
-      // }
-      
-      // const collectionId = findCollectionId(productsT, collectionsT);
-      // console.log("Collection ID:", collectionId);
-      
-  const handleCreate = () => {
-    console.log(collections);
-    const productData: CreateProductData = {
-        title: response.data.short_description,
-        is_giftcard: false,
-        discountable: false,
-        collection_id:"pcol_01HP1QGVSS0Y4AJ5K7AXDCG6SH",
-        thumbnail:"https://medusa-public-images.s3.eu-west-1.amazonaws.com/sweatpants-gray-front.png",
-        images:["https://medusa-public-images.s3.eu-west-1.amazonaws.com/sweatpants-gray-front.png"],
-        options:[
-          {
-          
-            "title": "XL",
+      setProducts(response.data.results);
+      setLoading(false);
+      setCount(response.data.count);
+      setNextPage(response.data.next);
+      setPrevPage(response.data.previous);
+    } catch (error) {
+      toast({ 
+        title: "Error",
+        description: "An error occurred while fetching products",
+        variant: "error"
+      })
+      setLoading(false);
+    }
+  };
+
+  const fetchCategories = async () => {
+    try {
+      const response = await axios.get(
+        "http://13.51.207.54/api/categories/",
+        {
+          headers: {
+            accept: "application/json",
           },
+        }
+      );
+      setAllCategories(response.data.results);
+      setLoading(false);
+    } catch (error) {
+      toast({ 
+        title: "Error",
+        description: "An error occurred while fetching categories details",
+        variant: "error"
+      })
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+    fetchCategories();
+  }, []);
+
+  const setVarients = (varients: any[], product): any[] => {
+    let newVarientObjs = [];
+    varients.forEach(element => {
+      newVarientObjs.push({
+        ...(product.short_description && { title: product.short_description }),
+        ...(element.item_number && { sku: `ALPB-${element.item_number}` }),
+        ...(element.gtin && { barcode: element.gtin }),
+        ...(element.quantity  && { "inventory_quantity": element.quantity }),
+        ...(element.weight  && { weight: parseInt(element.weight), }),
+        "origin_country": "US",
+        prices: [{
+          currency_code:"usd",
+          ...(element.retail_price  && { amount: parseInt(element.retail_price) * 100 }),
+        }],
+        options: [
           {
-
-            "title": "green",
-          }
-        ],
-        variants:[
-          {
-            "title": "Green XL",
-            "options": [
-              {
-              
-                "value": "XL",
-              },
-              {
-
-                "value": "green",
-              }
-            ],
-            "prices": [
-              {
-                "currency_code": "usd",
-                "amount": 20000,
-               
-              },
-          
-            ],
-
+            ...(element.size && { value: element.size }),
+            
           },
-          {
-            "title": "Green XXL",
-            "options": [
-              {
-              
-                "value": "XXL",
-              },
-              {
-
-                "value": "green",
-              }
-            ],
-            "prices": [
-              {
-                "currency_code": "usd",
-                "amount": 10000,
-               
-              },
+        {
+          ...(element.color_name && { value: element.color_name }),
           
-            ],
+        }
+      ],
+      })
+    });
+    return newVarientObjs;
+  }
 
-          }
-        ]
-        
+  const getAllImages = (varients: any[]): any[] => {
+    let images = [];
+    varients.forEach(varient => {
+      images.push(`${baseUrl}/${varient?.front_image}`);
+    });
+    return images;
+  }
+
+  
+  const findCollectionId = (selectedProduct: ProductS, product_categoriesT: ProductCategory[], product) => {
+    console.log(product_categoriesT);
+    if(product_categoriesT.length > 0) {
+      const availableCategory = product_categoriesT.filter(category => {
+        return category.name === selectedProduct.category;
+      });
+      if(availableCategory.length > 0) {
+        handleCreateProduct(selectedProduct, availableCategory[0].id, product)
+      } else {
+        handleCreateCategory(product.category, true, selectedProduct, product)
       }
-    createProduct.mutate(productData as AdminPostProductsReq, {
+    } else {
+      handleCreateCategory(product.category, true, selectedProduct, product)
+    }
+  }
+
+  const handleCreateProduct = (productDetails, categoryId, clickedProductDetails) => {
+    const varientsData = setVarients(productDetails.variations, productDetails);
+    const images = getAllImages(productDetails.variations);
+    const createProductReq: AdminPostProductsReq = {
+      title: productDetails.short_description,
+    description: productDetails.
+    full_feature_description,
+    is_giftcard: false,
+    discountable: false,
+    images: [`${baseUrl}/${clickedProductDetails.front_image}`,
+  ...images],
+    // status: ProductStatus.DRAFT,
+    options: [
+      {
+      title: "Size"
+    },
+    {
+      title: "Color"
+    }
+  ],
+    variants: varientsData,
+    categories: [{
+      id: categoryId
+    }]
+      }
+    createProduct.mutate(createProductReq, {
       onSuccess: ({ product }) => {
-        alert("Product Successfully Exported.")
-        console.log(product.id);
+        toast({ 
+          title: "Export Product",
+          description: "Product Successfully Exported.",
+          variant: "success"
+        })
+      },
+      onError: ({ message }) => {
+        toast({ 
+          title: "Unable to export product",
+          description: "Unable to export product at the moment, please check after sometime.",
+          variant: "error"
+        })
       },
     });
   };
-  handleCreate();
+
+  const handleCreateCategory = (categoryName, createProduct?, selectedProduct?, product?) => {
+    const createCategoryReq: AdminPostProductCategoriesReq = {
+      name: categoryName
+    }
+      createCategory.mutate(createCategoryReq, {
+      onSuccess: ({ product_category }) => {
+        if(createProduct) {
+          handleCreateProduct(selectedProduct, product_category.id, product)
+          toast({ 
+            title: "Create Category",
+            description: "Category Successfully Created.",
+            variant: "success"
+          })
+        }
+      },
+      onError: ({ message }) => {
+        toast({ 
+          title: "Error",
+          description: "Unable to create categories at the moment, please check after sometime.",
+          variant: "error"
+        })
+      },
+    });
+  };
+
+  const handleExportClick = async (product) => {
+    try {
+      const selectedProductDetailsResponse = await axios.get(
+        `http://13.51.207.54/api/${product.product_number}/`,
+        {
+          headers: {
+            accept: "application/json",
+          },
+        }
+      );
+      const product_categoriesT: ProductCategory[] = product_categories;
+      const selectedProduct: ProductS = selectedProductDetailsResponse.data;
       
-      // Call handleCreate function with the response data
-      console.log(response.data);
-      setSingleProductData(response.data);
+      
+      findCollectionId(selectedProduct, product_categoriesT, product);
+      
+      // setSingleProductData(response.data);
     } catch (error) {
-      console.error("An error occurred while fetching product details:", error);
+      toast({ 
+        title: "Error",
+        description: "An error occurred while fetching product details, please check after sometime.",
+        variant: "error"
+      })
     }
   };
   
@@ -239,54 +253,191 @@ const CreateProduct = () => {
       setNextPage(response.data.next);
       setPrevPage(response.data.previous);
     } catch (error) {
-      setError("An error occurred while fetching products.");
+      toast({ 
+        title: "Error",
+        description: "An error occurred while fetching product details, please check after sometime.",
+        variant: "error"
+      })
     }
   };
 
+  const fetchProductsByCategories = async (category) => {
+    setLoading(true);
+    const categoryName = encodeURIComponent(category);
+    try {
+      const response = await axios.get(
+        `http://13.51.207.54/api/products/?category=${categoryName}`,
+        {
+          headers: {
+            accept: "application/json",
+          },
+        }
+      );
+      setProducts(response.data.results);
+      // setLoading(false);
+      setCount(response.data.count);
+        setNextPage(response.data.next);
+        setPrevPage(response.data.previous);
+    } catch (error) {
+      toast({ 
+        title: "Error",
+        description: "An error occurred while fetching product details, please check after sometime.",
+        variant: "error"
+      })
+      setLoading(false);
+    }
+  };
+
+  const onCategorySelect = (selectedOption) => {
+    console.log(selectedOption);
+    if(selectedOption === 'All') {
+      fetchData();
+    } else {
+      fetchProductsByCategories(selectedOption)
+    }
+  };
+
+  const debounce = (func, delay) => {
+    let timeoutId;
+    return function(...args) {
+      const context = this;
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => func.apply(context, args), delay);
+    };
+  };
+
+  const fetchSearchedProduct = async (productNumber) => {
+    setLoading(true);
+    try {
+      const response = await axios.get(
+        `http://13.51.207.54/api/${productNumber}/`,
+        {
+          headers: {
+            accept: "application/json",
+          },
+        }
+      );
+      setProducts([response.data]);
+      setLoading(false);
+    } catch (error) {
+      toast({ 
+        title: "Error",
+        description: "An error occurred while fetching product details, please check after sometime.",
+        variant: "error"
+      })
+      setLoading(false);
+    }
+  }
+
+  const handleSearch = debounce((value) => {
+    fetchSearchedProduct(value);
+  }, 500); 
+
+  const onSearchInputChange = (event) => {
+    const { value } = event.target;
+    setInputSearchValue(value);
+    handleSearch(value);
+  }
  
   return (
     <>
-    <div>
-     {/* <button onClick={handleCreate}>click me</button> */}
-    </div>
-    <div>
-    <div className="headerTab">
-        <div>
-            <h1>Alphabroder</h1>
-        </div>
-        <input
-          type="text"
-          placeholder="Search..."
-          value={searchTerm}
-          onChange={handleSearchChange}
-        />
-      </div>
-    {loading && <p>Loading...</p>}
-    {error && <p>{error}</p>}
-    <div className="product-grid">
-          {filteredProducts.map((product, index) => (
-            <div key={index} className="product-card">
-              <img src={`${baseUrl}/${product.front_image}`} alt={product.short_description} />
-              <h3>{product.short_description}</h3>
-              <p><b>Price Range:</b> ${product.price_range.min_price} - ${product.price_range.max_price}</p>
-              <p><b>Product Number:</b> ALPB{product.product_number}</p>
-              <p><b>Category:</b> {product.category}</p>
-              <p>{truncateDescription(product.full_feature_description, 80)}</p>
-              <button onClick={()=>handleExportClick (product.product_number)} >Export</button>            
+      <div className="container">
+        <div className="content">
+          <Toaster />
+          <div>
+            <div className="headerTab">
+              <div className="header-text">
+                <h1>Alphabroder</h1>
               </div>
-          ))}
+              {allCategories && (
+                <div className="category-filter-container">
+                  <Select onValueChange={onCategorySelect}>
+                    <Select.Trigger>
+                      <Select.Value placeholder="Categories..." />
+                    </Select.Trigger>
+                    <Select.Content>
+                      <Select.Item key={"All"} value={"All"}>
+                        {"All"}
+                      </Select.Item>
+                      {allCategories.map((item) => (
+                        <Select.Item key={item.category} value={item.category}>
+                          {item.category}
+                        </Select.Item>
+                      ))}
+                    </Select.Content>
+                  </Select>
+                </div>
+              )}
+            </div>
+            <div className="search-container">
+              <Input
+                placeholder="Search Using Product No."
+                id="search-input-id"
+                type="search"
+                value={inputSearchValue}
+                onChange={onSearchInputChange}
+                onKeyDown={onSearchInputChange}
+              />
+            </div>
+            <div className="product-content">
+              {loading && (
+                <div className="loader-container">
+                  <div className="loader-content">
+                    <CircularProgress color="inherit" />
+                  </div>
+                </div>
+              )}
+              {products && (
+                <div className="product-grid">
+                  {products.map((product, index) => (
+                    <div key={index} className="product-card">
+                      <img
+                        src={`${baseUrl}/${product.front_image}`}
+                        alt={product.short_description}
+                      />
+                      <h3>{product.short_description}</h3>
+                      <p>
+                        <b>Price Range:</b> ${product.price_range.min_price} - $
+                        {product.price_range.max_price}
+                      </p>
+                      <p>
+                        <b>Product Number:</b> ALPB{product.product_number}
+                      </p>
+                      <p>
+                        <b>Category:</b> {product.category}
+                      </p>
+                      <p>
+                        {truncateDescription(
+                          product.full_feature_description,
+                          80
+                        )}
+                      </p>
+                      <Button onClick={() => handleExportClick(product)}>
+                        Export
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {products && products.length > 1 && (
+                <div className="pagination">
+                  {prevPage && (
+                    <Button onClick={() => handlePageChange(prevPage)}>
+                      Previous
+                    </Button>
+                  )}
+                  {nextPage && (
+                    <Button onClick={() => handlePageChange(nextPage)}>
+                      Next
+                    </Button>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
-    <div className="pagination">
-        {prevPage && (
-          <button onClick={() => handlePageChange(prevPage)}>Previous</button>
-        )}
-        {nextPage && (
-          <button onClick={() => handlePageChange(nextPage)}>Next</button>
-        )}
-        {/* <p>Page 1 of {pageCount}</p> */}
       </div>
-  </div>
-  </>
+    </>
   );
 };
 
