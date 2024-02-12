@@ -1,12 +1,12 @@
 import { RouteConfig } from "@medusajs/admin"
-import React, { useEffect, useState } from 'react';
-import axios, { AxiosRequestConfig } from 'axios';
-import { useAdminCreateCollection, useAdminCreateProduct , useAdminCreateProductCategory, useAdminProductCategories} from "medusa-react";
+import { useEffect, useState } from 'react';
+import axios from 'axios';
+import { useAdminCreateProduct , useAdminCreateProductCategory, useAdminProductCategories} from "medusa-react";
 import { AdminPostProductCategoriesReq, AdminPostProductsReq, ProductCategory, ProductStatus } from "@medusajs/medusa";
 import './style.css'
 import { Button, Container, Heading, Input, Select, Toaster, useToast } from "@medusajs/ui";
 import CircularProgress from '@mui/material/CircularProgress';
-import { ALPB_BASE_URL, GET_ALL_CATEGORIES, GET_ALL_PRODUCTS, GET_PRODUCTS_BY_CATEGORIES, GET_PRODUCT_DETAILS } from "./constants";
+import { GET_ALL_CATEGORIES, GET_ALL_PRODUCTS, GET_PRODUCTS_BY_CATEGORIES, GET_PRODUCT_DETAILS, GET_PRODUCT_DETAILS_BY_PRODUCT_NUMBER } from "./constants";
 
 type Product = {
     product_number:string;
@@ -27,14 +27,11 @@ const CreateProduct = () => {
   const createProduct = useAdminCreateProduct();
   const createCategory = useAdminCreateProductCategory();
   const [products, setProducts] = useState<Product[]>([]);
-  const [filteredProducts, setFilteredProducts] = useState<Product[]>();
   const [allCategories, setAllCategories] = useState<Product[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
   const [count, setCount] = useState(0);
   const [nextPage, setNextPage] = useState(null);
   const [prevPage, setPrevPage] = useState(null);
-  const pageCount = Math.ceil(count / 25); // Assuming 5 items per page
   const imageUrlPrefix ="https://www.alphabroder.com/media/hires";
   const { product_categories, isLoading } = useAdminProductCategories();
   const [inputSearchValue, setInputSearchValue] = useState('');
@@ -137,7 +134,6 @@ const CreateProduct = () => {
 
   
   const findCollectionId = (selectedProduct: ProductS, product_categoriesT: ProductCategory[], product) => {
-    console.log(product_categoriesT);
     if(product_categoriesT.length > 0) {
       const availableCategory = product_categoriesT.filter(category => {
         return category.name === selectedProduct.category;
@@ -186,9 +182,12 @@ const CreateProduct = () => {
         })
       },
       onError: ({ message }) => {
+        if(message.split(" ").includes("422")) {
+          message = `Product with name ${createProductReq.title} already exists.`
+        }
         toast({ 
           title: "Unable to export product",
-          description: "Unable to export product at the moment, please check after sometime.",
+          description: message,
           variant: "error"
         })
       },
@@ -213,7 +212,7 @@ const CreateProduct = () => {
       onError: ({ message }) => {
         toast({ 
           title: "Error",
-          description: "Unable to create categories at the moment, please check after sometime.",
+          description: message,
           variant: "error"
         })
       },
@@ -223,7 +222,7 @@ const CreateProduct = () => {
   const handleExportClick = async (product) => {
     try {
       const selectedProductDetailsResponse = await axios.get(
-        `${GET_PRODUCT_DETAILS}${product.product_number}`,
+        `${GET_PRODUCT_DETAILS_BY_PRODUCT_NUMBER}${product.product_number}/`,
         {
           headers: {
             accept: "application/json",
@@ -236,11 +235,10 @@ const CreateProduct = () => {
       
       findCollectionId(selectedProduct, product_categoriesT, product);
       
-      // setSingleProductData(response.data);
     } catch (error) {
       toast({ 
         title: "Error",
-        description: "An error occurred while fetching product details, please check after sometime.",
+        description: error,
         variant: "error"
       })
     }
@@ -256,7 +254,7 @@ const CreateProduct = () => {
     } catch (error) {
       toast({ 
         title: "Error",
-        description: "An error occurred while fetching product details, please check after sometime.",
+        description: "Unable to proceed to next page, please check after sometime.",
         variant: "error"
       })
     }
@@ -290,7 +288,6 @@ const CreateProduct = () => {
   };
 
   const onCategorySelect = (selectedOption) => {
-    console.log(selectedOption);
     if(selectedOption === 'All') {
       fetchData();
     } else {
