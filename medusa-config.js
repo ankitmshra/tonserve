@@ -87,6 +87,9 @@ const modules = {
       redisUrl: REDIS_URL
     }
   },*/
+  productService: {
+    resolve: "@medusajs/product",
+  },
   inventoryService: {
     resolve: "@medusajs/inventory",
   },

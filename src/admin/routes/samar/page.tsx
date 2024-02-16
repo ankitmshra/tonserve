@@ -24,7 +24,7 @@ type Product = {
     category: string;
   }
 
-const CreateAlphabroderProduct = () => {
+const CreateSamarProduct = () => {
   const { toast } = useToast()
   const createProduct = useAdminCreateProduct();
   const createCategory = useAdminCreateProductCategory();
@@ -35,7 +35,7 @@ const CreateAlphabroderProduct = () => {
   const [count, setCount] = useState(0);
   const [nextPage, setNextPage] = useState(null);
   const [prevPage, setPrevPage] = useState(null);
-  const imageUrlPrefix ="https://www.alphabroder.com/media/hires";
+  const imageUrlPrefix ="https://www.samar.com/media/hires";
   const { product_categories, isLoading } = useAdminProductCategories();
   const [inputSearchValue, setInputSearchValue] = useState('');
   const [openModal, setOpenModal] = useState(false);
@@ -108,7 +108,7 @@ const CreateAlphabroderProduct = () => {
     fetchCategories();
   }, []);
 
-  const fromatCreateProductData = (variants: any[], product): any => {  
+  const fromatCreateProductData = (variants: any[], product): any => {
     let newVariantObjs: any[] = [];
     let colorsAdded = [];
     let sizeAdded = [];
@@ -123,12 +123,10 @@ const CreateAlphabroderProduct = () => {
         colorsAdded.push(variant.color_name);
         sizeAdded.push(variant.size);
         newVariantObjs.push({
-          manage_inventory: true,
           ...(product.short_description && { title: product.short_description }),
           ...(variant.item_number && { sku: `ALPB-${variant.item_number}` }),
           ...(variant.gtin && { barcode: variant.gtin }),
           ...(variant.quantity  && { "inventory_quantity": variant.quantity }),
-          ...(variant.weight  && { weight: parseInt(variant.weight), }),
           "origin_country": "US",
           prices: regions.map((region) => {
             return {
@@ -412,14 +410,13 @@ const CreateAlphabroderProduct = () => {
   const receiveSelectedInventory = (data) => {
     setOpenModal(false);
     selectedInventory = data;
-    // inventoryItemId = data.id;
     setInventoryItemId(data.id);
-    // setSelectedInventory(data);
     if(data) {
       exportProduct(clickedProductData);
     }
   };
 
+ 
   return (
     <>
       <div className="container">
@@ -434,7 +431,7 @@ const CreateAlphabroderProduct = () => {
           <div>
             <div className="headerTab">
               <div className="header-text">
-                <Heading>Alphabroder</Heading>
+                <Heading>Samar</Heading>
               </div>
               {allCategories && (
                 <div className="category-filter-container">
@@ -536,8 +533,8 @@ const CreateAlphabroderProduct = () => {
 
 export const config: RouteConfig = {
   link: {
-    label: "Alphabroder",
+    label: "Samar",
   },
 }
-export default CreateAlphabroderProduct;
+export default CreateSamarProduct;
 
