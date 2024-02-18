@@ -7,7 +7,7 @@ import './style.css'
 import { Button, Container, Heading, Input, Select, Toaster, useToast } from "@medusajs/ui";
 import CircularProgress from '@mui/material/CircularProgress';
 import { GET_ALL_CATEGORIES, GET_ALL_PRODUCTS, GET_PRODUCTS_BY_CATEGORIES, GET_PRODUCT_DETAILS, GET_PRODUCT_DETAILS_BY_PRODUCT_NUMBER } from "./constants";
-import InventoriesModal from "./inventoriesModal";
+// import InventoriesModal from "./inventoriesModal";
 import { chunkArray, copyObjectExceptKey } from "../utils";
 
 type Product = {
@@ -199,7 +199,7 @@ const CreateAlphabroderProduct = () => {
                 client.admin.inventoryItems.createLocationLevel(
                   response.variant.inventory[0].id, 
                   {
-                    location_id: selectedInventory.id,
+                    location_id: inventoryList.stock_locations[0].id,
                     stocked_quantity: variant.inventory_quantity,
                   }
                 )
@@ -229,7 +229,7 @@ const CreateAlphabroderProduct = () => {
                   client.admin.inventoryItems.createLocationLevel(
                     response.variant.inventory[0].id, 
                     {
-                      location_id: selectedInventory.id,
+                      location_id: inventoryList.stock_locations[0].id,
                       stocked_quantity: variant.inventory_quantity,
                     }
                   )
@@ -281,8 +281,7 @@ const CreateAlphabroderProduct = () => {
   };
 
   const handleExportClick = async (product) => {
-    setClickedProductData(product);
-    fetchInventoryList();
+    exportProduct(product);
   }
 
   const exportProduct = async (product) => {
@@ -403,34 +402,11 @@ const CreateAlphabroderProduct = () => {
     handleSearch(value);
   }
 
-  const fetchInventoryList = () => {
-    if(inventoryList.count) {
-      setOpenModal(true);
-    }
-  };
-
-  const receiveSelectedInventory = (data) => {
-    setOpenModal(false);
-    selectedInventory = data;
-    // inventoryItemId = data.id;
-    setInventoryItemId(data.id);
-    // setSelectedInventory(data);
-    if(data) {
-      exportProduct(clickedProductData);
-    }
-  };
-
   return (
     <>
       <div className="container">
         <div className="content">
           <Toaster />
-          {inventoryList.count && (
-                <div className={openModal? "inventory-modal" : ""}>
-                <InventoriesModal open={openModal} setOpenModal={setOpenModal} inventories={inventoryList.stock_locations}
-                receiveSelectedInventory={receiveSelectedInventory}></InventoriesModal>
-                          </div>
-              )}
           <div>
             <div className="headerTab">
               <div className="header-text">
