@@ -105,12 +105,6 @@ const modules = {
   productService: {
     resolve: "@medusajs/product",
   },
-  inventoryService: {
-    resolve: "@medusajs/inventory",
-  },
-  stockLocationService: {
-    resolve: "@medusajs/stock-location",
-  },
 };
 
 const featureFlags = {

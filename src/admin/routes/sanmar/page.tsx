@@ -35,7 +35,6 @@ type Product = {
     const [count, setCount] = useState(0);
     const [nextPage, setNextPage] = useState(null);
     const [prevPage, setPrevPage] = useState(null);
-    const imageUrlPrefix ="https://www.alphabroder.com/media/hires";
     const { product_categories, isLoading } = useAdminProductCategories();
     const [inputSearchValue, setInputSearchValue] = useState('');
     const [openModal, setOpenModal] = useState(false);
@@ -115,9 +114,8 @@ type Product = {
       let images: string[] = [];
       variants.forEach(variant => {
         if(!colorsAdded.includes(variant.color_name) && !sizeAdded.includes(variant.size)) {
-          images.push(`${imageUrlPrefix}/${variant?.front_image}`);
-          images.push(`${imageUrlPrefix}/${variant?.back_image}`);
-          images.push(`${imageUrlPrefix}/${variant?.side_image}`);
+          images.push(`${variant?.front_image}`);
+          images.push(`${variant?.back_image}`);
         }
         // if(variant?.color_name && variant?.size) {
           colorsAdded.push(variant.color_name);
@@ -125,7 +123,7 @@ type Product = {
           newVariantObjs.push({
             manage_inventory: true,
             ...(product.short_description && { title: product.short_description }),
-            ...(variant.item_number && { sku: `ALPB-${variant.item_number}` }),
+            ...(variant.item_number && { sku: `SNMR-${variant.item_number}` }),
             ...(variant.gtin && { barcode: variant.gtin }),
             ...(variant.quantity  && { "inventory_quantity": variant.quantity }),
             ...(variant.weight  && { weight: parseInt(variant.weight), }),
@@ -176,7 +174,7 @@ type Product = {
       full_feature_description,
       is_giftcard: false,
       discountable: false,
-      images: [`${imageUrlPrefix}/${clickedProductDetails.front_image}`,
+      images: [`${clickedProductDetails.front_image}`,
     ...variantsAndImagesData.images],
       options: [
         {
@@ -370,7 +368,7 @@ type Product = {
   
     const fetchSearchedProduct = async (productNumber) => {
       setLoading(true);
-      const product_id = productNumber.replace("ALPB", "");
+      const product_id = productNumber.replace("SNMR", "");
       try {
         const response = await axios.get(
           `${GET_PRODUCT_DETAILS}${product_id}`,
@@ -401,6 +399,13 @@ type Product = {
       setInputSearchValue(value);
       handleSearch(value);
     }
+
+    const decodeHTML = (html) => {
+      const txt = document.createElement('textarea');
+      txt.innerHTML = html;
+      return txt.value;
+    };
+  
   
     return (
       <>
@@ -410,7 +415,7 @@ type Product = {
             <div>
               <div className="headerTab">
                 <div className="header-text">
-                  <Heading>Alphabroder</Heading>
+                  <Heading>SanMar</Heading>
                 </div>
                 {allCategories && (
                   <div className="category-filter-container">
@@ -460,23 +465,24 @@ type Product = {
                     {products.map((product, index) => (
                       <div key={index} className="product-card">
                         <img
-                          src={`${imageUrlPrefix}/${product.front_image}`}
+                          src={`${product.front_image}`}
                           alt={product.short_description}
                         />
-                        <h3>{product.short_description}</h3>
+                        <h3>{decodeHTML(product.short_description)}</h3>
+                        <br/>
                         <p>
                           <b>Price Range:</b> ${product.price_range.min_price} - $
                           {product.price_range.max_price}
                         </p>
                         <p>
-                          <b>Product Number:</b> ALPB{product.product_number}
+                          <b>Product Number:</b> SNMR{product.product_number}
                         </p>
                         <p>
                           <b>Category:</b> {product.category}
                         </p>
                         <p>
                           {truncateDescription(
-                            product.full_feature_description,
+                            decodeHTML(product.full_feature_description),
                             80
                           )}
                         </p>
@@ -512,7 +518,7 @@ type Product = {
 
 export const config: RouteConfig = {
   link: {
-    label: "Samar",
+    label: "SanMar",
   },
 }
 export default CreateSamarProduct;
