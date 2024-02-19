@@ -1,13 +1,12 @@
 import { RouteConfig } from "@medusajs/admin"
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
-import { useAdminCreateInventoryItem, useAdminCreateLocationLevel, useAdminCreateProduct , useAdminCreateProductCategory, useAdminInventoryItems, useAdminProductCategories, useAdminRegions, useAdminStockLocations, useAdminUpdateLocationLevel, useAdminUpdateVariant, useAdminVariantsInventory, useMedusa} from "medusa-react";
+import { useAdminCreateProduct , useAdminCreateProductCategory, useAdminInventoryItems, useAdminProductCategories, useAdminRegions, useAdminStockLocations, useAdminUpdateLocationLevel, useAdminUpdateVariant, useAdminVariantsInventory, useMedusa} from "medusa-react";
 import { AdminPostProductCategoriesReq, AdminPostProductsReq, ProductCategory } from "@medusajs/medusa";
 import './style.css'
 import { Button, Container, Heading, Input, Select, Toaster, useToast } from "@medusajs/ui";
 import CircularProgress from '@mui/material/CircularProgress';
 import { GET_ALL_CATEGORIES, GET_ALL_PRODUCTS, GET_PRODUCTS_BY_CATEGORIES, GET_PRODUCT_DETAILS, GET_PRODUCT_DETAILS_BY_PRODUCT_NUMBER } from "./constants";
-import InventoriesModal from "./inventoriesModal";
 import { chunkArray, copyObjectExceptKey } from "../utils";
 
 type Product = {
@@ -28,7 +27,7 @@ type Product = {
     const { toast } = useToast()
     const createProduct = useAdminCreateProduct();
     const createCategory = useAdminCreateProductCategory();
-    const inventoryList = useAdminStockLocations();
+    // const inventoryList = useAdminStockLocations();
     const [products, setProducts] = useState<Product[]>([]);
     const [allCategories, setAllCategories] = useState<Product[]>([]);
     const [loading, setLoading] = useState<boolean>(true);
@@ -37,13 +36,6 @@ type Product = {
     const [prevPage, setPrevPage] = useState(null);
     const { product_categories, isLoading } = useAdminProductCategories();
     const [inputSearchValue, setInputSearchValue] = useState('');
-    const [openModal, setOpenModal] = useState(false);
-    const [clickedProductData, setClickedProductData] = useState<Product>();
-    let selectedInventory: any;
-    const [inventoryItemId, setInventoryItemId] = useState("");
-    const { 
-      inventory_items,
-    } = useAdminInventoryItems();
     const { regions } = useAdminRegions();
     const { client } = useMedusa()
     
@@ -117,11 +109,11 @@ type Product = {
           images.push(`${variant?.front_image}`);
           images.push(`${variant?.back_image}`);
         }
-        // if(variant?.color_name && variant?.size) {
           colorsAdded.push(variant.color_name);
           sizeAdded.push(variant.size);
           newVariantObjs.push({
-            manage_inventory: true,
+            manage_inventory: false,
+            inventory_quantity: variant.quantity ?  variant.quantity : 0,
             ...(product.short_description && { title: product.short_description }),
             ...(variant.item_number && { sku: `SNMR-${variant.item_number}` }),
             ...(variant.gtin && { barcode: variant.gtin }),
@@ -145,7 +137,6 @@ type Product = {
             }
           ],
           })
-        // }
       });
       return { variants: newVariantObjs, images: images};
     }
@@ -154,8 +145,9 @@ type Product = {
     const findCollectionId = (selectedProduct: ProductS, product_categoriesT: ProductCategory[], product) => {
       if(product_categoriesT.length > 0) {
         const availableCategory = product_categoriesT.filter(category => {
-          return category.name === selectedProduct.category;
+          return category.name.trim() === selectedProduct.category.trim();
         });
+        console.log(availableCategory);
         if(availableCategory.length > 0) {
           handleCreateProduct(selectedProduct, availableCategory[0].id, product)
         } else {
@@ -191,21 +183,6 @@ type Product = {
         }
       createProduct.mutate(createProductReq, {
         onSuccess: ({ product }) => {
-              product.variants.forEach(variant => {
-                client.admin.variants.getInventory
-                (variant.id).then(response => {
-                  client.admin.inventoryItems.createLocationLevel(
-                    response.variant.inventory[0].id, 
-                    {
-                      location_id: inventoryList.stock_locations[0].id,
-                      stocked_quantity: variant.inventory_quantity,
-                    }
-                  )
-                  .then(({ inventory_item }) => {
-                    console.log(inventory_item.id)
-                  })
-                });
-            });
           toast({ 
             title: "Export Product",
             description: "Product Successfully Exported.",
@@ -221,21 +198,6 @@ type Product = {
               chunk.forEach(data => {
                 client.admin.products.createVariant(product.id, data)
               .then(({ product }) => {
-                product.variants.forEach(variant => {
-                  client.admin.variants.getInventory
-                  (variant.id).then(response => {
-                    client.admin.inventoryItems.createLocationLevel(
-                      response.variant.inventory[0].id, 
-                      {
-                        location_id: inventoryList.stock_locations[0].id,
-                        stocked_quantity: variant.inventory_quantity,
-                      }
-                    )
-                    .then(({ inventory_item }) => {
-                      console.log(inventory_item.id)
-                    })
-                  });
-              })
               })
               });
             })
@@ -269,8 +231,11 @@ type Product = {
           }
         },
         onError: ({ message }) => {
+          if(message.split(" ").includes("422")) {
+            message = `Category with name ${categoryName} already exists.`
+          }
           toast({ 
-            title: "Error",
+            title: "Unable to export product",
             description: message,
             variant: "error"
           })
