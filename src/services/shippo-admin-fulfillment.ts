@@ -1,24 +1,17 @@
-import { Cart, Fulfillment, LineItem, Order, User } from "@medusajs/medusa";
+import { AbstractFulfillmentService, Cart, Fulfillment, LineItem, Order, setMetadata } from "@medusajs/medusa";
 import { log } from "console";
-import { FulfillmentService } from "medusa-interfaces";
-import FetchAddressService from "./fetchAddress";
 const shippo = require('shippo');
 
-class ShippoAdminFulfillmentService extends FulfillmentService {
+class ShippoAdminFulfillmentService extends AbstractFulfillmentService {
   static identifier = "shippo-admin";
 
-    private shippoClient;
-    private fetchAddressService: FetchAddressService;
-
+  private shippoClient;
 
   constructor(container, options) {
     super(container)
     const apiKey = "shippo_test_e5833aff35b985f39755ea360c6d0f381e198a7c";
     this.shippoClient = shippo(apiKey);
-    this.fetchAddressService = new FetchAddressService();
-
   }
-  
 
   async getFulfillmentOptions(): Promise<any[]> {
     return [
@@ -33,28 +26,28 @@ class ShippoAdminFulfillmentService extends FulfillmentService {
     data: Record<string, unknown>,
     cart: Cart
   ): Promise<Record<string, unknown>> {
-    try{
-      const shipment = await this.shippoClient.address.create(
-        {
-          "name":cart.shipping_address.first_name+" "+cart.shipping_address.last_name, 
-          "company":cart.shipping_address.company,
-          "street1":cart.shipping_address.address_1,
-          "street2":cart.shipping_address.address_2,
-          "city":cart.shipping_address.city,
-          "state":cart.shipping_address.province,
-          "zip":cart.shipping_address.postal_code,
-          "country":cart.shipping_address.country_code,
-          "email":cart.email,
-          "validate": true
-        }
-      )
+    try {
+      const shipment = await this.shippoClient.address.create({
+        "name": cart.shipping_address.first_name + " " + cart.shipping_address.last_name,
+        "company": cart.shipping_address.company,
+        "street1": cart.shipping_address.address_1,
+        "street2": cart.shipping_address.address_2,
+        "city": cart.shipping_address.city,
+        "state": cart.shipping_address.province,
+        "zip": cart.shipping_address.postal_code,
+        "country": cart.shipping_address.country_code,
+        "email": cart.email,
+        "validate": true
+      });
+
       log("Shipment:", shipment)
-      if(shipment.is_complete == false){
+
+      if (shipment.is_complete == false) {
         if (shipment.validation_results.is_valid !== true) {
-        throw new Error(shipment.validation_results.messages.text)
+          throw new Error(shipment.validation_results.messages.text)
         }
       }
-    }catch (error) {
+    } catch (error) {
       throw new Error(error)
     }
     return {
@@ -102,67 +95,71 @@ class ShippoAdminFulfillmentService extends FulfillmentService {
     order: Order,
     fulfillment: Fulfillment,
   ) {
-    log("Fulfillment Data:",fulfillment)
-    const senderAddress = await FetchAddressService.getAddress(fulfillment.location_id);
-    log("Sender Address:", senderAddress);
-    
+    log("Fulfillment Data:", fulfillment)
 
+    const response = await this.shippoClient.shipment.create({
+      "address_from": {
+        "name": "Jacob Hoyt",
+        "company": "Hoyt Company",
+        "street1": "333 Legend Avenue",
+        "city": "New York",
+        "state": "NY",
+        "zip": "10003",
+        "country": "US"
+      },
+      "address_to": {
+        "name": order.billing_address.first_name + " " + order.billing_address.last_name,
+        "street1": order.billing_address.address_1 + " " + order.billing_address.address_2,
+        "city": order.billing_address.city,
+        "state": order.billing_address.province,
+        "zip": order.billing_address.postal_code,
+        "country": order.billing_address.country_code
+      },
+      "parcels": [{
+        "length": "5",
+        "width": "5",
+        "height": "5",
+        "distance_unit": "in",
+        "weight": "2",
+        "mass_unit": "lb"
+      }],
+      "async": false
+    })
 
-      const response = await this.shippoClient.shipment.create({
-          "address_from": {
-            "name" : "Jacob Hoyt",
-            "company" : senderAddress.company,
-            "street1": senderAddress.address_1,
-            "city":  senderAddress.city,
-            "state":senderAddress.address_2,
-            "zip": senderAddress.postal_code,
-            "country": senderAddress.country_code
-        },
-          "address_to": {
-            "name": order.billing_address.first_name+" "+order.billing_address.last_name,
-            "street1": order.billing_address.address_1+" "+order.billing_address.address_2,
-            "city": order.billing_address.city,
-            "state": order.billing_address.province,
-            "zip": order.billing_address.postal_code,
-            "country": order.billing_address.country_code
-        },
-          "parcels" : [{
-            "length": "5",
-            "width": "5",
-            "height": "5",
-            "distance_unit": "in",
-            "weight": "2",
-            "mass_unit": "lb"
-          }],
-          "async": false
-      })
+    let cheapestRateAmount = Infinity;
+    let cheapestRateId = null;
 
-      let cheapestRateAmount = Infinity;
-      let cheapestRateId = null;
+    log("shipment:", response)
 
-      log("shipment:",response)
+    response.rates.forEach(rate => {
+      const amount = parseFloat(rate.amount);
+      if (amount < cheapestRateAmount) {
+        cheapestRateAmount = amount;
+        cheapestRateId = rate.object_id;
+      }
+    });
 
-      response.rates.forEach(rate => {
-        const amount = parseFloat(rate.amount);
-        if (amount < cheapestRateAmount) {
-          cheapestRateAmount = amount;
-          cheapestRateId = rate.object_id;
-        }
-      });
+    log("Cheapest rate object ID:", cheapestRateId);
 
-      log("Cheapest rate object ID:", cheapestRateId);
+    const label = await this.shippoClient.transaction.create({
+      "rate": cheapestRateId,
+      "label_file_type": "PDF",
+      "async": false
+    })
 
-      const label = await this.shippoClient.transaction.create({
-        "rate": cheapestRateId,
-        "label_file_type": "PDF",
-        "async": false
-      }) 
-      log("Label:", label);
+    log("label_data: ", label.tracking_url)
+    log("Tracking URL:", label.label_url);
+    log("Tracking NUMBER:", label.tracking_number);
 
-      return { data, order };
+    // Save label URL and tracking URL provider in order metadata
+    const orderMetadata = order.metadata || {};
+    orderMetadata.shipping_label_url = label.label_url; // Add label URL to metadata
+    orderMetadata.tracking_url_provider = label.tracking_url_provider; // Add tracking URL provider 
+    orderMetadata.tracking_number = label.tracking_number; // Add tracking URL provider
+    setMetadata(order, orderMetadata); // Set the updated metadata to the order
 
+    return { data, order };
   }
-  
 
   cancelFulfillment() {
     return Promise.resolve({})
@@ -172,20 +169,20 @@ class ShippoAdminFulfillmentService extends FulfillmentService {
     data: Record<string, unknown>
   ): Promise<any> {
     return {
-        ...data
+      ...data
     };
   }
 
   async getReturnDocuments(
     data: Record<string, unknown>
   ): Promise<any> {
-    return {...data}
+    return { ...data }
   }
 
   async getShipmentDocuments(
     data: Record<string, unknown>
   ): Promise<any> {
-    return {...data}
+    return { ...data }
   }
 
   async retrieveDocuments(
@@ -195,7 +192,7 @@ class ShippoAdminFulfillmentService extends FulfillmentService {
     return {}
   }
 
-  
+
 }
 
-export default ShippoAdminFulfillmentService
+export default ShippoAdminFulfillmentService;

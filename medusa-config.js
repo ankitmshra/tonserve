@@ -71,7 +71,22 @@ const plugins = [
       api_key: process.env.OPENAI_API_KEY,
       enableUI: true
     }
-  }
+  },
+  {
+    resolve: `medusa-plugin-sendgrid`,
+    options: {
+      api_key: process.env.SENDGRID_API_KEY,
+      from: process.env.SENDGRID_FROM,
+      order_placed_template: 
+        process.env.SENDGRID_ORDER_PLACED_ID,
+      localization: {
+        "en-US": {
+          order_placed_template:
+            process.env.SENDGRID_ORDER_PLACED_ID_LOCALIZED,
+        },
+      },
+    },
+  },
 ];
 
 const modules = {
@@ -87,12 +102,6 @@ const modules = {
       redisUrl: REDIS_URL
     }
   },*/
-  inventoryService: {
-    resolve: "@medusajs/inventory",
-  },
-  stockLocationService: {
-    resolve: "@medusajs/stock-location",
-  },
 };
 
 const featureFlags = {
