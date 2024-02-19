@@ -147,7 +147,6 @@ type Product = {
         const availableCategory = product_categoriesT.filter(category => {
           return category.name.trim() === selectedProduct.category.trim();
         });
-        console.log(availableCategory);
         if(availableCategory.length > 0) {
           handleCreateProduct(selectedProduct, availableCategory[0].id, product)
         } else {
