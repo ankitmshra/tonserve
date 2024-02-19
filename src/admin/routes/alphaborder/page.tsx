@@ -1,12 +1,14 @@
 import { RouteConfig } from "@medusajs/admin"
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import axios from 'axios';
-import { useAdminCreateProduct , useAdminCreateProductCategory, useAdminProductCategories} from "medusa-react";
-import { AdminPostProductCategoriesReq, AdminPostProductsReq, ProductCategory, ProductStatus } from "@medusajs/medusa";
+import { useAdminCreateInventoryItem, useAdminCreateLocationLevel, useAdminCreateProduct , useAdminCreateProductCategory, useAdminInventoryItems, useAdminProductCategories, useAdminRegions, useAdminStockLocations, useAdminUpdateLocationLevel, useAdminUpdateVariant, useAdminVariantsInventory, useMedusa} from "medusa-react";
+import { AdminPostProductCategoriesReq, AdminPostProductsReq, ProductCategory } from "@medusajs/medusa";
 import './style.css'
 import { Button, Container, Heading, Input, Select, Toaster, useToast } from "@medusajs/ui";
 import CircularProgress from '@mui/material/CircularProgress';
 import { GET_ALL_CATEGORIES, GET_ALL_PRODUCTS, GET_PRODUCTS_BY_CATEGORIES, GET_PRODUCT_DETAILS, GET_PRODUCT_DETAILS_BY_PRODUCT_NUMBER } from "./constants";
+// import InventoriesModal from "./inventoriesModal";
+import { chunkArray, copyObjectExceptKey } from "../utils";
 
 type Product = {
     product_number:string;
@@ -22,10 +24,11 @@ type Product = {
     category: string;
   }
 
-const CreateProduct = () => {
+const CreateAlphabroderProduct = () => {
   const { toast } = useToast()
   const createProduct = useAdminCreateProduct();
   const createCategory = useAdminCreateProductCategory();
+  const inventoryList = useAdminStockLocations();
   const [products, setProducts] = useState<Product[]>([]);
   const [allCategories, setAllCategories] = useState<Product[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -35,6 +38,16 @@ const CreateProduct = () => {
   const imageUrlPrefix ="https://www.alphabroder.com/media/hires";
   const { product_categories, isLoading } = useAdminProductCategories();
   const [inputSearchValue, setInputSearchValue] = useState('');
+  const [openModal, setOpenModal] = useState(false);
+  const [clickedProductData, setClickedProductData] = useState<Product>();
+  let selectedInventory: any;
+  const [inventoryItemId, setInventoryItemId] = useState("");
+  const { 
+    inventory_items,
+  } = useAdminInventoryItems();
+  const { regions } = useAdminRegions();
+  const { client } = useMedusa()
+  
 
   const truncateDescription = (text: string, maxLength: number) => {
     if (text.length > maxLength) {
@@ -95,41 +108,48 @@ const CreateProduct = () => {
     fetchCategories();
   }, []);
 
-  const setVarients = (varients: any[], product): any[] => {
-    let newVarientObjs = [];
-    varients.forEach(element => {
-      newVarientObjs.push({
-        ...(product.short_description && { title: product.short_description }),
-        ...(element.item_number && { sku: `ALPB-${element.item_number}` }),
-        ...(element.gtin && { barcode: element.gtin }),
-        ...(element.quantity  && { "inventory_quantity": element.quantity }),
-        ...(element.weight  && { weight: parseInt(element.weight), }),
-        "origin_country": "US",
-        prices: [{
-          currency_code:"usd",
-          ...(element.retail_price  && { amount: parseInt(element.retail_price) * 100 }),
-        }],
-        options: [
+  const fromatCreateProductData = (variants: any[], product): any => {  
+    let newVariantObjs: any[] = [];
+    let colorsAdded = [];
+    let sizeAdded = [];
+    let images: string[] = [];
+    variants.forEach(variant => {
+      if(!colorsAdded.includes(variant.color_name) && !sizeAdded.includes(variant.size)) {
+        images.push(`${imageUrlPrefix}/${variant?.front_image}`);
+        images.push(`${imageUrlPrefix}/${variant?.back_image}`);
+        images.push(`${imageUrlPrefix}/${variant?.side_image}`);
+      }
+      // if(variant?.color_name && variant?.size) {
+        colorsAdded.push(variant.color_name);
+        sizeAdded.push(variant.size);
+        newVariantObjs.push({
+          manage_inventory: true,
+          ...(product.short_description && { title: product.short_description }),
+          ...(variant.item_number && { sku: `ALPB-${variant.item_number}` }),
+          ...(variant.gtin && { barcode: variant.gtin }),
+          ...(variant.quantity  && { "inventory_quantity": variant.quantity }),
+          ...(variant.weight  && { weight: parseInt(variant.weight), }),
+          "origin_country": "US",
+          prices: regions.map((region) => {
+            return {
+              currency_code: region.currency_code,
+              amount: parseInt(variant.retail_price)
+            }
+          }),
+          options: [
+            {
+              ...(variant.size && { value: variant.size }),
+              
+            },
           {
-            ...(element.size && { value: element.size }),
+            ...(variant.color_name && { value: variant.color_name }),
             
-          },
-        {
-          ...(element.color_name && { value: element.color_name }),
-          
-        }
-      ],
-      })
+          }
+        ],
+        })
+      // }
     });
-    return newVarientObjs;
-  }
-
-  const getAllImages = (varients: any[]): any[] => {
-    let images = [];
-    varients.forEach(varient => {
-      images.push(`${imageUrlPrefix}/${varient?.front_image}`);
-    });
-    return images;
+    return { variants: newVariantObjs, images: images};
   }
 
   
@@ -149,8 +169,7 @@ const CreateProduct = () => {
   }
 
   const handleCreateProduct = (productDetails, categoryId, clickedProductDetails) => {
-    const varientsData = setVarients(productDetails.variations, productDetails);
-    const images = getAllImages(productDetails.variations);
+    const variantsAndImagesData = fromatCreateProductData(productDetails.variations, productDetails);
     const createProductReq: AdminPostProductsReq = {
       title: productDetails.short_description,
     description: productDetails.
@@ -158,8 +177,7 @@ const CreateProduct = () => {
     is_giftcard: false,
     discountable: false,
     images: [`${imageUrlPrefix}/${clickedProductDetails.front_image}`,
-  ...images],
-    // status: ProductStatus.DRAFT,
+  ...variantsAndImagesData.images],
     options: [
       {
       title: "Size"
@@ -168,20 +186,63 @@ const CreateProduct = () => {
       title: "Color"
     }
   ],
-    variants: varientsData,
+    variants: variantsAndImagesData.variants,
     categories: [{
       id: categoryId
-    }]
+    }],
       }
     createProduct.mutate(createProductReq, {
       onSuccess: ({ product }) => {
+            product.variants.forEach(variant => {
+              client.admin.variants.getInventory
+              (variant.id).then(response => {
+                client.admin.inventoryItems.createLocationLevel(
+                  response.variant.inventory[0].id, 
+                  {
+                    location_id: inventoryList.stock_locations[0].id,
+                    stocked_quantity: variant.inventory_quantity,
+                  }
+                )
+                .then(({ inventory_item }) => {
+                  console.log(inventory_item.id)
+                })
+              });
+          });
         toast({ 
           title: "Export Product",
           description: "Product Successfully Exported.",
           variant: "success"
-        })
+        });
       },
       onError: ({ message }) => {
+        if(message.split(" ").includes("413")) {
+          client.admin.products.create(copyObjectExceptKey(createProductReq, 'variants'))
+          .then(({ product }) => {
+          const chunkedArray = chunkArray(createProductReq.variants, 100);
+          chunkedArray.forEach((chunk: any[]) => {
+            chunk.forEach(data => {
+              client.admin.products.createVariant(product.id, data)
+            .then(({ product }) => {
+              product.variants.forEach(variant => {
+                client.admin.variants.getInventory
+                (variant.id).then(response => {
+                  client.admin.inventoryItems.createLocationLevel(
+                    response.variant.inventory[0].id, 
+                    {
+                      location_id: inventoryList.stock_locations[0].id,
+                      stocked_quantity: variant.inventory_quantity,
+                    }
+                  )
+                  .then(({ inventory_item }) => {
+                    console.log(inventory_item.id)
+                  })
+                });
+            })
+            })
+            });
+          })
+        })
+        }
         if(message.split(" ").includes("422")) {
           message = `Product with name ${createProductReq.title} already exists.`
         }
@@ -220,6 +281,10 @@ const CreateProduct = () => {
   };
 
   const handleExportClick = async (product) => {
+    exportProduct(product);
+  }
+
+  const exportProduct = async (product) => {
     try {
       const selectedProductDetailsResponse = await axios.get(
         `${GET_PRODUCT_DETAILS_BY_PRODUCT_NUMBER}${product.product_number}/`,
@@ -231,7 +296,6 @@ const CreateProduct = () => {
       );
       const product_categoriesT: ProductCategory[] = product_categories;
       const selectedProduct: ProductS = selectedProductDetailsResponse.data;
-      
       
       findCollectionId(selectedProduct, product_categoriesT, product);
       
@@ -337,7 +401,7 @@ const CreateProduct = () => {
     setInputSearchValue(value);
     handleSearch(value);
   }
- 
+
   return (
     <>
       <div className="container">
@@ -451,5 +515,5 @@ export const config: RouteConfig = {
     label: "Alphabroder",
   },
 }
-export default CreateProduct;
+export default CreateAlphabroderProduct;
 

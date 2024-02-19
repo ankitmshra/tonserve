@@ -31,7 +31,7 @@ type CreateProductData = {
 }
 
 const CreateProductAlpha = () => {
-  const createProduct = useAdminCreateProduct()
+  const createProduct = useAdminCreateProduct();
   // ...
 
   const handleCreate = (productData: CreateProductData) => {
